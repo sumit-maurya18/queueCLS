@@ -1,3 +1,7 @@
-import { createCLI } from "./cli/cli";
+// import "./database/database";
+// import { createCLI } from "./cli/cli";
 
-createCLI();
+// createCLI();
+
+import "./database/database";
+import "./tests/jobRepositoryTest";
