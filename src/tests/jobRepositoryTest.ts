@@ -3,9 +3,15 @@ import { Job } from "../models/Job";
 
 const repository = new JobRepository();
 
+console.log("==================================");
+console.log("JOB REPOSITORY TEST");
+console.log("==================================");
+
+const id = `job-${Date.now()}`;
+
 const job: Job = {
-    id: "job-1",
-    command: "echo Hello World",
+    id,
+    command: "echo Hello QueueCTL",
     state: "pending",
     attempts: 0,
     max_retries: 3,
@@ -17,26 +23,36 @@ const job: Job = {
     updated_at: new Date().toISOString()
 };
 
-console.log("========== Repository Test ==========\n");
-
-// Create
-console.log("Creating Job...");
+console.log("\nCreating Job...");
 repository.create(job);
-console.log("Job Created\n");
 
-// Exists
-console.log("Checking Exists...");
-console.log(repository.exists("job-1"));
-console.log();
+console.log("\nChecking Exists...");
+console.log(repository.exists(id));
 
-// Find By ID
-console.log("Finding By ID...");
-console.log(repository.findById("job-1"));
-console.log();
+console.log("\nFinding By ID...");
+console.log(repository.findById(id));
 
-// Find All
-console.log("Finding All Jobs...");
+console.log("\nFinding Pending Jobs...");
+console.log(repository.findByState("pending"));
+
+console.log("\nUpdating Job...");
+
+job.state = "completed";
+job.updated_at = new Date().toISOString();
+
+repository.update(job);
+
+console.log(repository.findById(id));
+
+console.log("\nDeleting Job...");
+repository.delete(id);
+
+console.log("\nChecking Exists After Delete...");
+console.log(repository.exists(id));
+
+console.log("\nAll Jobs...");
 console.log(repository.findAll());
-console.log();
 
-console.log("========== Test Completed ==========");
+console.log("\n==================================");
+console.log("TEST FINISHED");
+console.log("==================================");

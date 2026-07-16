@@ -3,9 +3,6 @@ import { Job } from "../models/Job";
 
 export class JobRepository {
 
-    /**
-     * Inserts a new job into the database.
-     */
     create(job: Job): void {
 
         const statement = database.prepare(`
@@ -41,9 +38,6 @@ export class JobRepository {
 
     }
 
-    /**
-     * Returns true if the job exists.
-     */
     exists(id: string): boolean {
 
         const statement = database.prepare(`
@@ -52,15 +46,10 @@ export class JobRepository {
             WHERE id = ?
         `);
 
-        const row = statement.get(id);
-
-        return row !== undefined;
+        return statement.get(id) !== undefined;
 
     }
 
-    /**
-     * Returns a job by its ID.
-     */
     findById(id: string): Job | undefined {
 
         const statement = database.prepare(`
@@ -73,9 +62,6 @@ export class JobRepository {
 
     }
 
-    /**
-     * Returns all jobs.
-     */
     findAll(): Job[] {
 
         const statement = database.prepare(`
@@ -84,6 +70,50 @@ export class JobRepository {
         `);
 
         return statement.all() as Job[];
+
+    }
+
+    findByState(state: string): Job[] {
+
+        const statement = database.prepare(`
+            SELECT *
+            FROM jobs
+            WHERE state = ?
+        `);
+
+        return statement.all(state) as Job[];
+
+    }
+
+    update(job: Job): void {
+
+        const statement = database.prepare(`
+            UPDATE jobs
+            SET
+                command = @command,
+                state = @state,
+                attempts = @attempts,
+                max_retries = @max_retries,
+                last_error = @last_error,
+                next_retry_at = @next_retry_at,
+                locked_by = @locked_by,
+                locked_at = @locked_at,
+                updated_at = @updated_at
+            WHERE id = @id
+        `);
+
+        statement.run(job);
+
+    }
+
+    delete(id: string): void {
+
+        const statement = database.prepare(`
+            DELETE FROM jobs
+            WHERE id = ?
+        `);
+
+        statement.run(id);
 
     }
 
