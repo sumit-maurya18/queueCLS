@@ -18,3 +18,8 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+#Tests
+tests/database/*.db
+tests/database/*.db-shm
+tests/database/*.db-wal
