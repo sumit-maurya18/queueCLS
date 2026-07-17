@@ -245,4 +245,125 @@ updateJobResult(
     );
 }
 
+findJobsReadyForRetry(): Job[] {
+    const now = new Date().toISOString();
+
+    const statement = database.prepare(`
+        SELECT *
+        FROM jobs
+        WHERE state = 'retry_wait'
+          AND next_retry_at IS NOT NULL
+          AND next_retry_at <= ?
+        ORDER BY next_retry_at ASC
+    `);
+
+    return statement.all(now) as Job[];
+}
+
+scheduleRetry(
+    id: string,
+    nextRetryAt: string,
+    exitCode: number | null,
+    lastError: string | null
+): void {
+    const statement = database.prepare(`
+        UPDATE jobs
+        SET
+            state = 'retry_wait',
+            exit_code = ?,
+            last_error = ?,
+            next_retry_at = ?,
+            locked_by = NULL,
+            locked_at = NULL,
+            updated_at = ?
+        WHERE id = ?
+    `);
+
+    statement.run(
+        exitCode,
+        lastError,
+        nextRetryAt,
+        new Date().toISOString(),
+        id
+    );
+}
+
+markPendingForRetry(id: string): void {
+    const statement = database.prepare(`
+        UPDATE jobs
+        SET
+            state = 'pending',
+            next_retry_at = NULL,
+            locked_by = NULL,
+            locked_at = NULL,
+            updated_at = ?
+        WHERE id = ?
+          AND state = 'retry_wait'
+    `);
+
+    statement.run(
+        new Date().toISOString(),
+        id
+    );
+}
+
+moveToDLQ(
+    id: string,
+    exitCode: number | null,
+    lastError: string | null
+): void {
+    const statement = database.prepare(`
+        UPDATE jobs
+        SET
+            state = 'dlq',
+            exit_code = ?,
+            last_error = ?,
+            next_retry_at = NULL,
+            locked_by = NULL,
+            locked_at = NULL,
+            updated_at = ?
+        WHERE id = ?
+    `);
+
+    statement.run(
+        exitCode,
+        lastError,
+        new Date().toISOString(),
+        id
+    );
+}
+
+findDLQJobs(): Job[] {
+    const statement = database.prepare(`
+        SELECT *
+        FROM jobs
+        WHERE state = 'dlq'
+        ORDER BY updated_at DESC
+    `);
+
+    return statement.all() as Job[];
+}
+
+retryDLQJob(id: string): void {
+    const statement = database.prepare(`
+        UPDATE jobs
+        SET
+            state = 'pending',
+            attempts = 0,
+            exit_code = NULL,
+            last_error = NULL,
+            next_retry_at = NULL,
+            locked_by = NULL,
+            locked_at = NULL,
+            updated_at = ?
+        WHERE id = ?
+          AND state = 'dlq'
+    `);
+
+    statement.run(
+        new Date().toISOString(),
+        id
+    );
+}
+
 }
