@@ -3,12 +3,42 @@ import { JobRepository } from "../repository/JobRepository";
 
 export class WorkerService {
     private repository = new JobRepository();
+    private readonly POLL_INTERVAL = 1000;
 
-    processNextJob(): void {
+    private running = false;
+
+    start(): void {
+        if (this.running) {
+            return;
+        }
+
+        this.running = true;
+
+        console.log("Worker started.");
+
+        this.processJobs();
+
+        process.on("SIGINT", () => {
+            console.log("\nStopping worker...");
+            this.stop();
+        });
+    }
+
+    stop(): void {
+        this.running = false;
+        console.log("Worker stopped.");
+        process.exit(0);
+    }
+
+    private processJobs(): void {
+        if (!this.running) {
+            return;
+        }
+
         const job = this.repository.findNextPendingJob();
 
         if (!job) {
-            console.log("No pending jobs.");
+            setTimeout(() => this.processJobs(), this.POLL_INTERVAL);
             return;
         }
 
@@ -18,14 +48,16 @@ export class WorkerService {
         this.repository.incrementAttempts(job.id);
 
         exec(job.command, (error) => {
+
             if (error) {
                 console.error(`Job ${job.id} failed.`);
                 this.repository.updateJobState(job.id, "failed");
-                return;
+            } else {
+                console.log(`Job ${job.id} completed.`);
+                this.repository.updateJobState(job.id, "completed");
             }
 
-            console.log(`Job ${job.id} completed.`);
-            this.repository.updateJobState(job.id, "completed");
+            setImmediate(() => this.processJobs());
         });
     }
 }

@@ -8,7 +8,7 @@ export function registerWorkerCommand(program: Command): void {
         .action(() => {
             try {
                 const worker = new WorkerService();
-                worker.processNextJob();
+                worker.start();
             } catch (error) {
                 if (error instanceof Error) {
                     console.error(error.message);
