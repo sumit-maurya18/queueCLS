@@ -12,6 +12,8 @@ export interface Job {
 
     last_error: string | null;
 
+    exit_code: number | null;
+
     next_retry_at: string | null;
 
     locked_by: string | null;

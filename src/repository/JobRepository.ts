@@ -13,6 +13,7 @@ export class JobRepository {
                 attempts,
                 max_retries,
                 last_error,
+                exit_code,
                 next_retry_at,
                 locked_by,
                 locked_at,
@@ -26,6 +27,7 @@ export class JobRepository {
                 @attempts,
                 @max_retries,
                 @last_error,
+                @exit_code,
                 @next_retry_at,
                 @locked_by,
                 @locked_at,
@@ -167,5 +169,80 @@ export class JobRepository {
         statement.run(id);
 
     }
+
+    lockJob(id: string, workerId: string): boolean {
+
+    const statement = database.prepare(`
+        UPDATE jobs
+        SET
+            state = 'running',
+            locked_by = ?,
+            locked_at = ?,
+            updated_at = ?
+        WHERE
+            id = ?
+            AND state = 'pending'
+            AND locked_by IS NULL
+    `);
+
+    const result = statement.run(
+        workerId,
+        new Date().toISOString(),
+        new Date().toISOString(),
+        id
+    );
+
+    return result.changes === 1;
+
+}
+
+unlockJob(id: string): void {
+
+    const statement = database.prepare(`
+        UPDATE jobs
+        SET
+            locked_by = NULL,
+            locked_at = NULL,
+            updated_at = ?
+        WHERE id = ?
+    `);
+
+    statement.run(
+        new Date().toISOString(),
+        id
+    );
+
+}
+
+updateJobResult(
+    id: string,
+    state: string,
+    exitCode: number | null,
+    lastError: string | null,
+    nextRetryAt: string | null
+): void {
+
+    const statement = database.prepare(`
+        UPDATE jobs
+        SET
+            state = ?,
+            exit_code = ?,
+            last_error = ?,
+            next_retry_at = ?,
+            locked_by = NULL,
+            locked_at = NULL,
+            updated_at = ?
+        WHERE id = ?
+    `);
+
+    statement.run(
+        state,
+        exitCode,
+        lastError,
+        nextRetryAt,
+        new Date().toISOString(),
+        id
+    );
+}
 
 }

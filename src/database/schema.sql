@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS jobs (
 
     last_error TEXT,
 
+    exit_code INTEGER,
+
     next_retry_at TEXT,
 
     locked_by TEXT,

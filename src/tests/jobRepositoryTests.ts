@@ -16,6 +16,7 @@ const job: Job = {
     attempts: 0,
     max_retries: 3,
     last_error: null,
+    exit_code: null,
     next_retry_at: null,
     locked_by: null,
     locked_at: null,

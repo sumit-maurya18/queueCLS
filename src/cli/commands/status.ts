@@ -20,6 +20,7 @@ export function registerStatusCommand(program: Command): void {
                         Attempts: job.attempts,
                         Retries: job.max_retries,
                         "Last Error": job.last_error ?? "-",
+                        "Exit Code": job.exit_code ?? "-",
                         "Next Retry": job.next_retry_at ?? "-",
                         "Locked By": job.locked_by ?? "-",
                         "Locked At": job.locked_at ?? "-",

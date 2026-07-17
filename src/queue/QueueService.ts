@@ -36,6 +36,7 @@ export class QueueService {
             attempts: 0,
             max_retries: maxRetries,
             last_error: null,
+            exit_code: null,
             next_retry_at: null,
             locked_by: null,
             locked_at: null,
