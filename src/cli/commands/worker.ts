@@ -4,10 +4,28 @@ import { WorkerService } from "../../services/WorkerService";
 export function registerWorkerCommand(program: Command): void {
     program
         .command("worker")
-        .description("Process the next pending job")
-        .action(() => {
+        .description("Start the background job worker")
+        .option(
+            "-c, --concurrency <number>",
+            "Maximum number of jobs processed concurrently",
+            "3"
+        )
+        .action((options) => {
             try {
-                const worker = new WorkerService();
+                const concurrency = Number(options.concurrency);
+
+                if (
+                    !Number.isInteger(concurrency) ||
+                    concurrency < 1
+                ) {
+                    console.error(
+                        "Concurrency must be a positive integer."
+                    );
+                    return;
+                }
+
+                const worker = new WorkerService(concurrency);
+
                 worker.start();
             } catch (error) {
                 if (error instanceof Error) {

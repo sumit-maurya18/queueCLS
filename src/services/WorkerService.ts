@@ -10,7 +10,20 @@ export class WorkerService {
     private readonly POLL_INTERVAL = 1000;
     private readonly workerId = crypto.randomUUID();
 
+    private readonly concurrency: number;
+    private activeJobs = 0;
+
     private running = false;
+
+    constructor(concurrency: number = 3) {
+        if (concurrency < 1) {
+            throw new Error(
+                "Worker concurrency must be at least 1."
+            );
+        }
+
+        this.concurrency = concurrency;
+    }
 
     start(): void {
         if (this.running) {
@@ -19,22 +32,33 @@ export class WorkerService {
 
         this.running = true;
 
-        console.log(`Worker started (${this.workerId})`);
+        console.log(
+            `Worker started (${this.workerId})`
+        );
 
-        this.processJobs();
+        console.log(
+            `Concurrency limit: ${this.concurrency}`
+        );
 
         process.on("SIGINT", () => {
-            console.log("\nStopping worker...");
+            console.log("\nShutdown requested...");
             this.stop();
         });
+
+        this.processJobs();
     }
 
     stop(): void {
         this.running = false;
 
-        console.log("Worker stopped.");
+        if (this.activeJobs === 0) {
+            console.log("Worker stopped.");
+            process.exit(0);
+        }
 
-        process.exit(0);
+        console.log(
+            `Waiting for ${this.activeJobs} active job(s) to finish...`
+        );
     }
 
     private processJobs(): void {
@@ -42,81 +66,95 @@ export class WorkerService {
             return;
         }
 
-        /*
-         * Move retry_wait jobs whose retry time has arrived
-         * back to the pending state.
-         */
         this.retryService.processRetries();
 
-        const job = this.repository.findNextPendingJob();
+        while (
+            this.running &&
+            this.activeJobs < this.concurrency
+        ) {
+            const job =
+                this.repository.findNextPendingJob();
 
-        if (!job) {
+            if (!job) {
+                break;
+            }
+
+            const locked = this.repository.lockJob(
+                job.id,
+                this.workerId
+            );
+
+            if (!locked) {
+                continue;
+            }
+
+            this.activeJobs++;
+
+            console.log(
+                `Processing job: ${job.id} | Active: ${this.activeJobs}/${this.concurrency}`
+            );
+
+            this.repository.incrementAttempts(job.id);
+
+            exec(job.command, (error) => {
+                if (error) {
+                    console.error(
+                        `Job ${job.id} failed.`
+                    );
+
+                    const exitCode =
+                        typeof error.code === "number"
+                            ? error.code
+                            : 1;
+
+                    this.retryService.handleFailure(
+                        job,
+                        exitCode,
+                        error.message
+                    );
+                } else {
+                    this.repository.updateJobResult(
+                        job.id,
+                        "completed",
+                        0,
+                        null,
+                        null
+                    );
+
+                    console.log(
+                        `Job ${job.id} completed.`
+                    );
+                }
+
+                this.activeJobs--;
+
+                console.log(
+                    `Active jobs: ${this.activeJobs}/${this.concurrency}`
+                );
+
+                if (!this.running) {
+                    if (this.activeJobs === 0) {
+                        console.log("Worker stopped.");
+                        process.exit(0);
+                    }
+
+                    return;
+                }
+
+                setImmediate(
+                    () => this.processJobs()
+                );
+            });
+        }
+
+        if (
+            this.running &&
+            this.activeJobs < this.concurrency
+        ) {
             setTimeout(
                 () => this.processJobs(),
                 this.POLL_INTERVAL
             );
-
-            return;
         }
-
-        const locked = this.repository.lockJob(
-            job.id,
-            this.workerId
-        );
-
-        if (!locked) {
-            setImmediate(() => this.processJobs());
-            return;
-        }
-
-        console.log(
-            `Worker ${this.workerId} processing job: ${job.id}`
-        );
-
-        /*
-         * Increment before execution.
-         *
-         * The Job object was fetched before this increment,
-         * so RetryService calculates the current attempt as:
-         *
-         * job.attempts + 1
-         */
-        this.repository.incrementAttempts(job.id);
-
-        exec(job.command, (error) => {
-
-            if (error) {
-                console.error(
-                    `Job ${job.id} failed.`
-                );
-
-                const exitCode =
-                    typeof error.code === "number"
-                        ? error.code
-                        : 1;
-
-                this.retryService.handleFailure(
-                    job,
-                    exitCode,
-                    error.message
-                );
-            } else {
-                this.repository.updateJobResult(
-                    job.id,
-                    "completed",
-                    0,
-                    null,
-                    null
-                );
-
-                console.log(
-                    `Job ${job.id} completed.`
-                );
-            }
-
-            setImmediate(
-                () => this.processJobs()
-            );
-        });
     }
 }
