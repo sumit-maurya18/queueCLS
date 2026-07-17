@@ -6,6 +6,7 @@ import { registerStatusCommand } from "./commands/status";
 import { registerListCommand } from "./commands/list";
 import { registerConfigCommand } from "./commands/config";
 import { registerDLQCommand } from "./commands/dlq";
+import { registerDeleteCommand } from "./commands/delete";
 
 export function registerCommands(program: Command): void {
     registerEnqueueCommand(program);
@@ -14,4 +15,5 @@ export function registerCommands(program: Command): void {
     registerListCommand(program);
     registerConfigCommand(program);
     registerDLQCommand(program);
+    registerDeleteCommand(program);
 }

@@ -5,27 +5,17 @@ import { DuplicateJobError } from "../errors/DuplicateJobError";
 import { DatabaseError } from "../errors/DatabaseError";
 
 export class QueueService {
+    private repository = new JobRepository();
 
-    private readonly repository: JobRepository;
-
-    constructor() {
-        this.repository = new JobRepository();
-    }
-
-    enqueue(
-        id: string,
-        command: string,
-        maxRetries: number = 3
-    ): Job {
-
+    enqueue(id: string, command: string, maxRetries: number = 3): Job {
         id = id.trim();
         command = command.trim();
 
-        if (id.length === 0) {
+        if (!id) {
             throw new ValidationError("Job ID cannot be empty.");
         }
 
-        if (command.length === 0) {
+        if (!command) {
             throw new ValidationError("Command cannot be empty.");
         }
 
@@ -34,10 +24,10 @@ export class QueueService {
         }
 
         if (this.repository.exists(id)) {
-            throw new DuplicateJobError(id);
+            throw new DuplicateJobError(`Job with ID '${id}' already exists.`);
         }
 
-        const timestamp = new Date().toISOString();
+        const now = new Date().toISOString();
 
         const job: Job = {
             id,
@@ -49,26 +39,49 @@ export class QueueService {
             next_retry_at: null,
             locked_by: null,
             locked_at: null,
-            created_at: timestamp,
-            updated_at: timestamp
+            created_at: now,
+            updated_at: now,
         };
 
         try {
-
             this.repository.create(job);
-
+            return job;
         } catch (error) {
+            throw new DatabaseError(
+                error instanceof Error ? error.message : "Failed to create job."
+            );
+        }
+    }
 
-            if (error instanceof Error) {
-                throw new DatabaseError(error.message);
-            }
+    listJobs(state?: string): Job[] {
+        return state
+            ? this.repository.findByState(state)
+            : this.repository.findAll();
+    }
 
-            throw new DatabaseError("Unknown database error.");
+    getJob(id: string): Job {
+        if (!id.trim()) {
+            throw new ValidationError("Job ID cannot be empty.");
+        }
 
+        const job = this.repository.findById(id);
+
+        if (!job) {
+            throw new ValidationError(`Job with ID '${id}' not found.`);
         }
 
         return job;
-
     }
 
+    deleteJob(id: string): void {
+        if (!id.trim()) {
+            throw new ValidationError("Job ID cannot be empty.");
+        }
+
+        if (!this.repository.exists(id)) {
+            throw new ValidationError(`Job with ID '${id}' not found.`);
+        }
+
+        this.repository.delete(id);
+    }
 }
