@@ -2,27 +2,46 @@ import { exec } from "child_process";
 import crypto from "crypto";
 import { JobRepository } from "../repository/JobRepository";
 import { RetryService } from "./RetryService";
+import { ConfigService } from "./ConfigService";
 
 export class WorkerService {
     private readonly repository = new JobRepository();
     private readonly retryService = new RetryService();
+    private readonly configService = new ConfigService();
 
-    private readonly POLL_INTERVAL = 1000;
     private readonly workerId = crypto.randomUUID();
 
     private readonly concurrency: number;
-    private activeJobs = 0;
+    private readonly pollInterval: number;
 
+    private activeJobs = 0;
     private running = false;
 
-    constructor(concurrency: number = 3) {
-        if (concurrency < 1) {
+    constructor(concurrency?: number) {
+        this.concurrency =
+            concurrency ??
+            this.configService.getNumber("worker_concurrency");
+
+        this.pollInterval =
+            this.configService.getNumber("poll_interval_ms");
+
+        if (
+            !Number.isInteger(this.concurrency) ||
+            this.concurrency < 1
+        ) {
             throw new Error(
                 "Worker concurrency must be at least 1."
             );
         }
 
-        this.concurrency = concurrency;
+        if (
+            !Number.isInteger(this.pollInterval) ||
+            this.pollInterval < 1
+        ) {
+            throw new Error(
+                "Worker poll interval must be at least 1 ms."
+            );
+        }
     }
 
     start(): void {
@@ -38,6 +57,10 @@ export class WorkerService {
 
         console.log(
             `Concurrency limit: ${this.concurrency}`
+        );
+
+        console.log(
+            `Poll interval: ${this.pollInterval} ms`
         );
 
         process.on("SIGINT", () => {
@@ -153,7 +176,7 @@ export class WorkerService {
         ) {
             setTimeout(
                 () => this.processJobs(),
-                this.POLL_INTERVAL
+                this.pollInterval
             );
         }
     }

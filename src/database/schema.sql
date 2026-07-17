@@ -27,11 +27,9 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 
 CREATE TABLE IF NOT EXISTS config (
-
     key TEXT PRIMARY KEY,
-
-    value TEXT NOT NULL
-
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_jobs_state
@@ -39,3 +37,30 @@ ON jobs(state);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_retry
 ON jobs(next_retry_at);
+
+INSERT OR IGNORE INTO config (
+    key,
+    value,
+    updated_at
+)
+VALUES
+    (
+        'worker_concurrency',
+        '3',
+        CURRENT_TIMESTAMP
+    ),
+    (
+        'poll_interval_ms',
+        '1000',
+        CURRENT_TIMESTAMP
+    ),
+    (
+        'base_retry_delay_ms',
+        '1000',
+        CURRENT_TIMESTAMP
+    ),
+    (
+        'default_max_retries',
+        '3',
+        CURRENT_TIMESTAMP
+    );

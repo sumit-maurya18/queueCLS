@@ -12,6 +12,13 @@ export function registerStatusCommand(program: Command): void {
 
                 const job = queueService.getJob(options.id);
 
+                if (!job) {
+                    console.error(
+                        `Job with ID '${options.id}' not found.`
+                    );
+                    return;
+                }
+
                 console.table([
                     {
                         ID: job.id,
@@ -25,8 +32,8 @@ export function registerStatusCommand(program: Command): void {
                         "Locked By": job.locked_by ?? "-",
                         "Locked At": job.locked_at ?? "-",
                         Created: job.created_at,
-                        Updated: job.updated_at,
-                    },
+                        Updated: job.updated_at
+                    }
                 ]);
             } catch (error) {
                 if (error instanceof Error) {

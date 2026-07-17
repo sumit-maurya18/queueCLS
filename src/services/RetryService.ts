@@ -1,27 +1,16 @@
 import { Job } from "../models/Job";
 import { JobRepository } from "../repository/JobRepository";
+import { ConfigService } from "./ConfigService";
 
 export class RetryService {
     private readonly repository = new JobRepository();
-
-    private readonly BASE_RETRY_DELAY_MS = 1000;
+    private readonly configService = new ConfigService();
 
     handleFailure(
         job: Job,
         exitCode: number | null,
         errorMessage: string
     ): void {
-        /*
-         * attempts has already been incremented by WorkerService
-         * before executing the command.
-         *
-         * Example with max_retries = 3:
-         *
-         * attempt 1 fails -> retry
-         * attempt 2 fails -> retry
-         * attempt 3 fails -> DLQ
-         */
-
         const currentAttempts = job.attempts + 1;
 
         if (currentAttempts >= job.max_retries) {
@@ -38,7 +27,8 @@ export class RetryService {
             return;
         }
 
-        const retryDelay = this.calculateBackoff(currentAttempts);
+        const retryDelay =
+            this.calculateBackoff(currentAttempts);
 
         const nextRetryAt = new Date(
             Date.now() + retryDelay
@@ -57,10 +47,13 @@ export class RetryService {
     }
 
     processRetries(): void {
-        const jobs = this.repository.findJobsReadyForRetry();
+        const jobs =
+            this.repository.findJobsReadyForRetry();
 
         for (const job of jobs) {
-            this.repository.markPendingForRetry(job.id);
+            this.repository.markPendingForRetry(
+                job.id
+            );
 
             console.log(
                 `Job ${job.id} is ready for retry.`
@@ -68,9 +61,16 @@ export class RetryService {
         }
     }
 
-    private calculateBackoff(attempts: number): number {
+    private calculateBackoff(
+        attempts: number
+    ): number {
+        const baseRetryDelay =
+            this.configService.getNumber(
+                "base_retry_delay_ms"
+            );
+
         return (
-            this.BASE_RETRY_DELAY_MS *
+            baseRetryDelay *
             Math.pow(2, attempts - 1)
         );
     }

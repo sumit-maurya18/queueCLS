@@ -1,86 +1,116 @@
 import { Job } from "../models/Job";
 import { JobRepository } from "../repository/JobRepository";
+import { ConfigService } from "../services/ConfigService";
 import { ValidationError } from "../errors/ValidationError";
 import { DuplicateJobError } from "../errors/DuplicateJobError";
-import { DatabaseError } from "../errors/DatabaseError";
 
 export class QueueService {
-    private repository = new JobRepository();
+    private readonly repository: JobRepository;
+    private readonly configService: ConfigService;
 
-    enqueue(id: string, command: string, maxRetries: number = 3): Job {
+    constructor() {
+        this.repository = new JobRepository();
+        this.configService = new ConfigService();
+    }
+
+    enqueue(
+        id: string,
+        command: string,
+        maxRetries?: number
+    ): Job {
         id = id.trim();
         command = command.trim();
 
-        if (!id) {
-            throw new ValidationError("Job ID cannot be empty.");
+        if (id.length === 0) {
+            throw new ValidationError(
+                "Job ID cannot be empty."
+            );
         }
 
-        if (!command) {
-            throw new ValidationError("Command cannot be empty.");
+        if (command.length === 0) {
+            throw new ValidationError(
+                "Command cannot be empty."
+            );
         }
 
-        if (maxRetries < 0) {
-            throw new ValidationError("Maximum retries cannot be negative.");
+        const retries =
+            maxRetries ??
+            this.configService.getNumber(
+                "default_max_retries"
+            );
+
+        if (
+            !Number.isInteger(retries) ||
+            retries < 1
+        ) {
+            throw new ValidationError(
+                "Maximum retries must be at least 1."
+            );
         }
 
         if (this.repository.exists(id)) {
-            throw new DuplicateJobError(`Job with ID '${id}' already exists.`);
+            throw new DuplicateJobError(
+                `Job with ID '${id}' already exists.`
+            );
         }
 
-        const now = new Date().toISOString();
+        const timestamp = new Date().toISOString();
 
         const job: Job = {
             id,
             command,
             state: "pending",
             attempts: 0,
-            max_retries: maxRetries,
+            max_retries: retries,
             last_error: null,
             exit_code: null,
             next_retry_at: null,
             locked_by: null,
             locked_at: null,
-            created_at: now,
-            updated_at: now,
+            created_at: timestamp,
+            updated_at: timestamp
         };
 
-        try {
-            this.repository.create(job);
-            return job;
-        } catch (error) {
-            throw new DatabaseError(
-                error instanceof Error ? error.message : "Failed to create job."
-            );
-        }
-    }
-
-    listJobs(state?: string): Job[] {
-        return state
-            ? this.repository.findByState(state)
-            : this.repository.findAll();
-    }
-
-    getJob(id: string): Job {
-        if (!id.trim()) {
-            throw new ValidationError("Job ID cannot be empty.");
-        }
-
-        const job = this.repository.findById(id);
-
-        if (!job) {
-            throw new ValidationError(`Job with ID '${id}' not found.`);
-        }
+        this.repository.create(job);
 
         return job;
     }
 
+    getJob(id: string): Job | undefined {
+        id = id.trim();
+
+        if (id.length === 0) {
+            throw new ValidationError(
+                "Job ID cannot be empty."
+            );
+        }
+
+        return this.repository.findById(id);
+    }
+
+    listJobs(state?: string): Job[] {
+        if (state) {
+            return this.repository.findByState(
+                state.trim()
+            );
+        }
+
+        return this.repository.findAll();
+    }
+
     deleteJob(id: string): void {
-        if (!id.trim()) {
-            throw new ValidationError("Job ID cannot be empty.");
+        id = id.trim();
+
+        if (id.length === 0) {
+            throw new ValidationError(
+                "Job ID cannot be empty."
+            );
         }
 
         if (!this.repository.exists(id)) {
-            throw new ValidationError(`Job with ID '${id}' not found.`);
+            throw new Error(
+                `Job with ID '${id}' does not exist.`
+            );
         }
 
         this.repository.delete(id);

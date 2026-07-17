@@ -7,24 +7,30 @@ export function registerWorkerCommand(program: Command): void {
         .description("Start the background job worker")
         .option(
             "-c, --concurrency <number>",
-            "Maximum number of jobs processed concurrently",
-            "3"
+            "Maximum number of jobs processed concurrently"
         )
         .action((options) => {
             try {
-                const concurrency = Number(options.concurrency);
+                let concurrency: number | undefined;
 
-                if (
-                    !Number.isInteger(concurrency) ||
-                    concurrency < 1
-                ) {
-                    console.error(
-                        "Concurrency must be a positive integer."
+                if (options.concurrency !== undefined) {
+                    concurrency = Number(
+                        options.concurrency
                     );
-                    return;
+
+                    if (
+                        !Number.isInteger(concurrency) ||
+                        concurrency < 1
+                    ) {
+                        console.error(
+                            "Concurrency must be a positive integer."
+                        );
+                        return;
+                    }
                 }
 
-                const worker = new WorkerService(concurrency);
+                const worker =
+                    new WorkerService(concurrency);
 
                 worker.start();
             } catch (error) {
