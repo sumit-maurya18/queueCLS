@@ -20,10 +20,14 @@ export class WorkerService {
     constructor(concurrency?: number) {
         this.concurrency =
             concurrency ??
-            this.configService.getNumber("worker_concurrency");
+            this.configService.getNumber(
+                "worker_concurrency"
+            );
 
         this.pollInterval =
-            this.configService.getNumber("poll_interval_ms");
+            this.configService.getNumber(
+                "poll_interval_ms"
+            );
 
         if (
             !Number.isInteger(this.concurrency) ||
@@ -63,10 +67,22 @@ export class WorkerService {
             `Poll interval: ${this.pollInterval} ms`
         );
 
-        process.on("SIGINT", () => {
-            console.log("\nShutdown requested...");
+        const shutdown = () => {
+            console.log(
+                "\nShutdown requested..."
+            );
             this.stop();
-        });
+        };
+
+        process.on(
+            "SIGINT",
+            shutdown
+        );
+
+        process.on(
+            "SIGTERM",
+            shutdown
+        );
 
         this.processJobs();
     }
@@ -75,7 +91,9 @@ export class WorkerService {
         this.running = false;
 
         if (this.activeJobs === 0) {
-            console.log("Worker stopped.");
+            console.log(
+                "Worker stopped."
+            );
             process.exit(0);
         }
 
@@ -93,7 +111,8 @@ export class WorkerService {
 
         while (
             this.running &&
-            this.activeJobs < this.concurrency
+            this.activeJobs <
+                this.concurrency
         ) {
             const job =
                 this.repository.findNextPendingJob();
@@ -102,10 +121,11 @@ export class WorkerService {
                 break;
             }
 
-            const locked = this.repository.lockJob(
-                job.id,
-                this.workerId
-            );
+            const locked =
+                this.repository.lockJob(
+                    job.id,
+                    this.workerId
+                );
 
             if (!locked) {
                 continue;
@@ -117,65 +137,85 @@ export class WorkerService {
                 `Processing job: ${job.id} | Active: ${this.activeJobs}/${this.concurrency}`
             );
 
-            this.repository.incrementAttempts(job.id);
+            this.repository.incrementAttempts(
+                job.id
+            );
 
-            exec(job.command, (error) => {
-                if (error) {
-                    console.error(
-                        `Job ${job.id} failed.`
-                    );
+            exec(
+                job.command,
+                (error) => {
 
-                    const exitCode =
-                        typeof error.code === "number"
-                            ? error.code
-                            : 1;
+                    if (error) {
 
-                    this.retryService.handleFailure(
-                        job,
-                        exitCode,
-                        error.message
-                    );
-                } else {
-                    this.repository.updateJobResult(
-                        job.id,
-                        "completed",
-                        0,
-                        null,
-                        null
-                    );
+                        console.error(
+                            `Job ${job.id} failed.`
+                        );
 
-                    console.log(
-                        `Job ${job.id} completed.`
-                    );
-                }
+                        const exitCode =
+                            typeof error.code ===
+                            "number"
+                                ? error.code
+                                : 1;
 
-                this.activeJobs--;
+                        this.retryService.handleFailure(
+                            job,
+                            exitCode,
+                            error.message
+                        );
 
-                console.log(
-                    `Active jobs: ${this.activeJobs}/${this.concurrency}`
-                );
+                    } else {
 
-                if (!this.running) {
-                    if (this.activeJobs === 0) {
-                        console.log("Worker stopped.");
-                        process.exit(0);
+                        this.repository.updateJobResult(
+                            job.id,
+                            "completed",
+                            0,
+                            null,
+                            null
+                        );
+
+                        console.log(
+                            `Job ${job.id} completed.`
+                        );
                     }
 
-                    return;
-                }
+                    this.activeJobs--;
 
-                setImmediate(
-                    () => this.processJobs()
-                );
-            });
+                    console.log(
+                        `Active jobs: ${this.activeJobs}/${this.concurrency}`
+                    );
+
+                    if (!this.running) {
+
+                        if (
+                            this.activeJobs ===
+                            0
+                        ) {
+                            console.log(
+                                "Worker stopped."
+                            );
+                            process.exit(
+                                0
+                            );
+                        }
+
+                        return;
+                    }
+
+                    setImmediate(() =>
+                        this.processJobs()
+                    );
+                }
+            );
         }
 
         if (
             this.running &&
-            this.activeJobs < this.concurrency
+            this.activeJobs <
+                this.concurrency
         ) {
             setTimeout(
-                () => this.processJobs(),
+                () =>
+                    this.processJobs(),
                 this.pollInterval
             );
         }

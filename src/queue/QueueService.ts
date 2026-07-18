@@ -49,9 +49,7 @@ export class QueueService {
         }
 
         if (this.repository.exists(id)) {
-            throw new DuplicateJobError(
-                `Job with ID '${id}' already exists.`
-            );
+            throw new DuplicateJobError(id);
         }
 
         const timestamp = new Date().toISOString();

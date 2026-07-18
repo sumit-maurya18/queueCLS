@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { JobRepository } from "../../repository/JobRepository";
+import { RetryService } from "../../services/RetryService";
 
 export function registerDLQCommand(program: Command): void {
     const dlq = program
@@ -43,69 +44,51 @@ export function registerDLQCommand(program: Command): void {
     dlq
         .command("retry")
         .description("Retry a job from the dead letter queue")
-        .requiredOption("--id <id>", "Job ID")
-        .action((options) => {
+        .argument("<job-id>", "Job ID")
+        .action((jobId: string) => {
             try {
-                const repository = new JobRepository();
+                const retryService = new RetryService();
 
-                const job = repository.findById(options.id);
-
-                if (!job) {
-                    console.error(
-                        `Job with ID '${options.id}' not found.`
-                    );
-                    return;
-                }
-
-                if (job.state !== "dlq") {
-                    console.error(
-                        `Job '${options.id}' is not in the DLQ.`
-                    );
-                    return;
-                }
-
-                repository.retryDLQJob(options.id);
-
-                console.log(
-                    `Job '${options.id}' moved from DLQ to pending.`
-                );
+                retryService.retryDLQJob(jobId);
             } catch (error) {
                 if (error instanceof Error) {
                     console.error(error.message);
                 } else {
                     console.error("Unknown error.");
                 }
+
+                process.exitCode = 1;
             }
         });
 
     dlq
         .command("delete")
         .description("Delete a job from the dead letter queue")
-        .requiredOption("--id <id>", "Job ID")
-        .action((options) => {
+        .argument("<job-id>", "Job ID")
+        .action((jobId: string) => {
             try {
                 const repository = new JobRepository();
 
-                const job = repository.findById(options.id);
+                const job = repository.findById(jobId);
 
                 if (!job) {
                     console.error(
-                        `Job with ID '${options.id}' not found.`
+                        `Job with ID '${jobId}' not found.`
                     );
                     return;
                 }
 
                 if (job.state !== "dlq") {
                     console.error(
-                        `Job '${options.id}' is not in the DLQ.`
+                        `Job '${jobId}' is not in the DLQ.`
                     );
                     return;
                 }
 
-                repository.delete(options.id);
+                repository.delete(jobId);
 
                 console.log(
-                    `Job '${options.id}' deleted from DLQ.`
+                    `Job '${jobId}' deleted from DLQ.`
                 );
             } catch (error) {
                 if (error instanceof Error) {

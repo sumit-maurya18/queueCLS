@@ -61,6 +61,28 @@ export class RetryService {
         }
     }
 
+    public retryDLQJob(id: string): void {
+        const job = this.repository.findById(id);
+
+        if (!job) {
+            throw new Error(
+                `Job '${id}' does not exist.`
+            );
+        }
+
+        if (job.state !== "dlq") {
+            throw new Error(
+                `Job '${id}' is not in the Dead Letter Queue.`
+            );
+        }
+
+        this.repository.retryDLQJob(id);
+
+        console.log(
+            `Job '${id}' moved from DLQ to pending.`
+        );
+    }
+
     private calculateBackoff(
         attempts: number
     ): number {
