@@ -1,5 +1,11 @@
 # QueueCTL
 
+## 🎥 Demo Video
+
+**Demo Link:** [Demo Video Link](https://drive.google.com/file/d/1rtQ1UHGhReffhwHfh9oQgc_iU8abVDDO/view?usp=drive_link)
+
+---
+
 A persistent command-line job queue and worker execution system built with Node.js, TypeScript, and SQLite.
 
 QueueCTL allows commands to be submitted as background jobs, persisted locally, and processed asynchronously by configurable workers. It implements core job-processing concepts including atomic job claiming, concurrent execution, automatic retries with exponential backoff, Dead Letter Queue handling, persistent configuration, and graceful worker shutdown.
@@ -125,59 +131,51 @@ npm run build
 ### 4. Verify the CLI
 
 ```bash
-npm run dev -- --help
+queuectl --help
 ```
 
-### 5. View Configuration
+### 5. Verify Configuration
 
 ```bash
-npm run dev -- config
+queuectl config get max-retries
 ```
 
-QueueCTL automatically initializes the required SQLite database structures and default configuration.
+QueueCTL automatically initializes the required SQLite database and default configuration on first run.
 
 ---
 
 ## CLI Usage
 
-The general development command format is:
+QueueCTL provides a command-line interface for managing jobs, workers, configuration, and the Dead Letter Queue.
+
+Display all available commands:
 
 ```bash
-npm run dev -- <command> [options]
+queuectl --help
 ```
 
-The primary CLI operations are:
-
-| Command | Purpose |
-|---|---|
-| `enqueue` | Submit a new job |
-| `status` | Inspect a specific job |
-| `list` | List persisted jobs |
-| `delete` | Delete a job |
-| `worker` | Start background job processing |
-| `config` | View or modify QueueCTL configuration |
-
-Display all commands:
+Display help for worker commands:
 
 ```bash
-npm run dev -- --help
+queuectl worker --help
 ```
 
-Display help for a specific command:
+### Core Commands
 
-```bash
-npm run dev -- <command> --help
-```
+| Command | Description |
+|----------|-------------|
+| `queuectl enqueue '{"id":"job1","command":"sleep 2"}'` | Enqueue a new background job |
+| `queuectl worker start --count 3` | Start worker processes |
+| `queuectl worker stop` | Gracefully stop all workers |
+| `queuectl status` | Show queue statistics |
+| `queuectl list` | List all jobs |
+| `queuectl list --state pending` | List jobs by state |
+| `queuectl dlq list` | View Dead Letter Queue |
+| `queuectl dlq retry <job-id>` | Retry a job from the Dead Letter Queue |
+| `queuectl config get max-retries` | View configuration |
+| `queuectl config set max-retries 3` | Update configuration |
 
-Example:
-
-```bash
-npm run dev -- enqueue --help
-```
-
-For practical examples demonstrating successful execution, concurrency, retries, DLQ behavior, persistence, and worker usage, see [`docs/CLI.md`](./docs/CLI.md).
-
----
+For more examples, see **docs/CLI.md**.
 
 ## Configuration
 
@@ -195,19 +193,13 @@ The primary configuration values are:
 View configuration:
 
 ```bash
-npm run dev -- config
+queuectl config get max-retries
 ```
 
-Update a configuration value:
+Update configuration:
 
 ```bash
-npm run dev -- config set <key> <value>
-```
-
-Example:
-
-```bash
-npm run dev -- config set worker_concurrency 3
+queuectl config set max-retries 3
 ```
 
 Configuration persists across normal application restarts.

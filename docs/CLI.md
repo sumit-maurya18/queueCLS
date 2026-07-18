@@ -7,25 +7,28 @@ Run all commands from the project root.
 ## Command Format
 
 ```bash
-npm run dev -- <command> [options]
+queuectl <command> [options]
 ```
 
 ## Available Commands
 
 | Command | Purpose | Parameters |
 |---|---|---|
-| `enqueue` | Add a new job to the queue | Job ID, command, optional max retries |
-| `status` | View a specific job | Job ID |
+| `enqueue` | Add a new job to the queue | Job JSON |
+| `status` | View queue status | None |
 | `list` | List jobs | Optional state filter |
 | `delete` | Delete a job | Job ID |
-| `worker` | Start processing jobs | Optional concurrency |
-| `config` | View configuration | None |
+| `worker start` | Start worker processes | Worker count |
+| `worker stop` | Stop all workers | None |
+| `dlq list` | List jobs in the Dead Letter Queue | None |
+| `dlq retry` | Retry a job from the Dead Letter Queue | Job ID |
+| `config get` | View configuration | Configuration key |
 | `config set` | Change configuration | Configuration key and value |
 
 To see the exact options for any command:
 
 ```bash
-npm run dev -- <command> --help
+queuectl <command> --help
 ```
 
 ---
@@ -35,13 +38,13 @@ npm run dev -- <command> --help
 Display all available commands:
 
 ```bash
-npm run dev -- --help
+queuectl --help
 ```
 
 Display help for a specific command:
 
 ```bash
-npm run dev -- enqueue --help
+queuectl enqueue --help
 ```
 
 ---
@@ -51,50 +54,23 @@ npm run dev -- enqueue --help
 Display the current QueueCTL configuration:
 
 ```bash
-npm run dev -- config
-```
-
-The main configuration values are:
-
-```text
-default_max_retries
-base_retry_delay_ms
-worker_concurrency
-poll_interval_ms
+queuectl config get max-retries
 ```
 
 ---
 
 # 3. Change Configuration
 
-Syntax:
+Set the maximum retry count:
 
 ```bash
-npm run dev -- config set <key> <value>
+queuectl config set max-retries 3
 ```
 
-Examples:
+Verify the change:
 
 ```bash
-npm run dev -- config set default_max_retries 3
-```
-
-```bash
-npm run dev -- config set base_retry_delay_ms 1000
-```
-
-```bash
-npm run dev -- config set worker_concurrency 3
-```
-
-```bash
-npm run dev -- config set poll_interval_ms 500
-```
-
-Verify the changes:
-
-```bash
-npm run dev -- config
+queuectl config get max-retries
 ```
 
 ---
@@ -103,26 +79,10 @@ npm run dev -- config
 
 Use `enqueue` to add a command to the queue.
 
-Required parameters:
-
-```text
-Job ID   → Unique identifier for the job
-Command  → Operating-system command to execute
-```
-
-An optional maximum retry value can override the configured default if supported by the command.
-
-Check the exact syntax:
+Example:
 
 ```bash
-npm run dev -- enqueue --help
-```
-
-Example job:
-
-```text
-ID: demo-job
-Command: echo Hello QueueCTL
+queuectl enqueue '{"id":"demo-job","command":"echo Hello QueueCTL"}'
 ```
 
 After enqueueing, the job starts in:
@@ -135,57 +95,28 @@ The command is not executed until a worker processes it.
 
 ---
 
-# 5. View Job Status
+# 5. View Queue Status
 
-Use `status` to inspect a job.
-
-Required parameter:
-
-```text
-Job ID
-```
-
-Check the exact syntax:
+Display the current queue status:
 
 ```bash
-npm run dev -- status --help
-```
-
-Example:
-
-```text
-demo-job
-```
-
-Before worker execution, the job should show:
-
-```text
-State: pending
-Attempts: 0
-```
-
-After successful execution:
-
-```text
-State: completed
-Attempts: 1
-Exit Code: 0
+queuectl status
 ```
 
 ---
 
 # 6. List Jobs
 
-Use `list` to display jobs stored in QueueCTL.
+Display all jobs:
 
 ```bash
-npm run dev -- list
+queuectl list
 ```
 
-If state filtering is supported, check:
+Filter by state if required:
 
 ```bash
-npm run dev -- list --help
+queuectl list --state pending
 ```
 
 Possible job states are:
@@ -200,17 +131,15 @@ dlq
 
 ---
 
-# 7. Start a Worker
+# 7. Start Workers
 
 The worker processes pending jobs.
 
-Open another terminal in the project directory and run:
+Open another terminal and run:
 
 ```bash
-npm run dev -- worker
+queuectl worker start --count 3
 ```
-
-The worker continuously checks for available jobs.
 
 A successful job follows:
 
@@ -218,31 +147,11 @@ A successful job follows:
 pending → running → completed
 ```
 
-For example, enqueue a job containing:
-
-```text
-echo Hello QueueCTL
-```
-
-Start the worker.
-
-The worker claims and executes the job.
-
-Check the job status afterward.
-
-Expected:
-
-```text
-State: completed
-Attempts: 1
-Exit Code: 0
-```
-
 ---
 
 # 8. Run Multiple Jobs
 
-Enqueue multiple jobs with unique IDs.
+Enqueue multiple jobs.
 
 Example:
 
@@ -252,48 +161,30 @@ job-2 → echo Second
 job-3 → echo Third
 ```
 
-Start the worker:
+Start three workers:
 
 ```bash
-npm run dev -- worker
+queuectl worker start --count 3
 ```
 
-If:
-
-```text
-worker_concurrency = 3
-```
-
-the worker can process up to three jobs concurrently.
-
-After successful execution:
-
-```text
-job-1 → completed
-job-2 → completed
-job-3 → completed
-```
+The jobs should complete concurrently.
 
 ---
 
 # 9. Test Retry Behavior
 
-Configure a short retry delay:
+Configure retries:
 
 ```bash
-npm run dev -- config set default_max_retries 3
-```
-
-```bash
-npm run dev -- config set base_retry_delay_ms 1000
+queuectl config set max-retries 3
 ```
 
 Enqueue a command that always fails.
 
-Start the worker:
+Start a worker:
 
 ```bash
-npm run dev -- worker
+queuectl worker start --count 1
 ```
 
 The job lifecycle becomes:
@@ -316,108 +207,80 @@ Each execution increases:
 attempts
 ```
 
-The next retry time is stored in:
-
-```text
-next_retry_at
-```
-
 ---
 
 # 10. Test Dead Letter Queue
 
-Keep a permanently failing job running with:
-
-```text
-default_max_retries = 3
-```
-
-After the allowed attempts are exhausted, the job moves to:
+After the retry limit is exhausted, the job moves to:
 
 ```text
 dlq
 ```
 
-The final status should contain information similar to:
+View DLQ jobs:
 
-```text
-State: dlq
-Attempts: 3
-Last Error: <execution error>
-Exit Code: <non-zero exit code>
+```bash
+queuectl dlq list
 ```
 
-The worker will no longer automatically retry the job.
+Retry a DLQ job:
+
+```bash
+queuectl dlq retry demo-job
+```
 
 ---
 
 # 11. Delete a Job
 
-Use `delete` to permanently remove a job.
-
-Required parameter:
-
-```text
-Job ID
-```
-
-Check the exact syntax:
+Delete a job:
 
 ```bash
-npm run dev -- delete --help
+queuectl delete --help
 ```
 
 After deletion, querying the same job ID should report that the job does not exist.
 
 ---
 
-# 12. Stop the Worker
+# 12. Stop Workers
 
-Press:
+Stop all running workers:
 
-```text
-Ctrl + C
+```bash
+queuectl worker stop
 ```
 
-The worker stops accepting new jobs.
-
-If jobs are currently running, QueueCTL waits for active jobs to finish before stopping.
+Workers finish active jobs before shutting down.
 
 ---
 
 # Quick Demonstration
 
-An evaluator can verify the application using this sequence:
-
 ```bash
 npm install
 npm run build
 npm test
-npm run dev -- config
-```
 
-Configure the queue:
+queuectl config set max-retries 3
 
-```bash
-npm run dev -- config set default_max_retries 3
-npm run dev -- config set base_retry_delay_ms 1000
-npm run dev -- config set worker_concurrency 3
-npm run dev -- config set poll_interval_ms 500
-```
+queuectl enqueue '{"id":"job1","command":"echo Hello QueueCTL"}'
 
-Then:
+queuectl worker start --count 3
 
-```text
-1. Enqueue a successful job.
-2. Check its status → pending.
-3. Start the worker.
-4. Check its status → completed.
-5. Enqueue multiple jobs to test concurrency.
-6. Enqueue a failing job to observe retry_wait.
-7. Allow it to exhaust its attempts to observe dlq.
-8. Use list to inspect all jobs.
-9. Use delete to remove a job.
-10. Press Ctrl + C to stop the worker.
+queuectl status
+
+queuectl list
+
+queuectl enqueue '{"id":"fail1","command":"invalid_command"}'
+
+queuectl dlq list
+
+queuectl dlq retry fail1
+
+queuectl delete job1
+
+queuectl worker stop
 ```
 
 The complete job lifecycle is:
@@ -441,5 +304,5 @@ pending → running → retry_wait → ... → running → dlq
 For exact command arguments and options supported by the current version:
 
 ```bash
-npm run dev -- <command> --help
+queuectl <command> --help
 ```
